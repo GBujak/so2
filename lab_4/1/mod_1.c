@@ -1,0 +1,93 @@
+#include<linux/module.h>
+#include<asm/uaccess.h>
+#include<linux/proc_fs.h>
+#include<linux/seq_file.h>
+
+static struct proc_dir_entry *directory_entry_pointer, *file_entry_pointer;
+static char *directory_name = "procfs_test", *file_name = "procfs_file";
+static char file_buffer[PAGE_SIZE];
+
+static int procfsmod_show(struct seq_file *seq, void *data)
+{
+	char *notice = (char *)data;
+	seq_putc(seq, file_buffer[0]);
+	seq_putc(seq, '\n');
+	return 0;
+}
+
+static void *procfsmod_seq_start(struct seq_file *s, loff_t *position)
+{
+	loff_t buffer_index = *position;
+	return (buffer_index<PAGE_SIZE && file_buffer[buffer_index]!='\0')?(void *)&file_buffer[buffer_index]:NULL;
+}
+
+static void *procfsmod_seq_next(struct seq_file *s, void *data, loff_t *position)
+{
+	loff_t next_element_index = ++*position;
+	return (next_element_index<PAGE_SIZE && file_buffer[next_element_index]!='\0')?(void *)&file_buffer[next_element_index]:NULL; 
+}
+
+static void procfsmod_seq_stop(struct seq_file *s, void *data)
+{
+}
+
+static struct seq_operations procfsmod_seq_operations = {
+	.start = procfsmod_seq_start,
+	.next = procfsmod_seq_next,
+	.stop = procfsmod_seq_stop,
+	.show = procfsmod_show
+};
+
+static int procfsmod_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, procfsmod_show, NULL);
+}
+
+static ssize_t procfsmod_wirte(struct file *file, const char __user *buffer, size_t count, loff_t *position)
+{
+	int length = count;
+	if(count>PAGE_SIZE)
+		length=PAGE_SIZE-1;
+	if(copy_from_user(file_buffer,buffer,length))
+		return -EFAULT;
+	file_buffer[length]='\0';
+	return length;
+}
+
+static struct file_operations procfsmod_fops = {
+	.owner = THIS_MODULE,
+	.open = procfsmod_open,
+	.read = seq_read,
+	.write = procfsmod_wirte,
+	.llseek = seq_lseek,
+	.release = single_release
+};
+
+static int __init procfsmod_init(void) 
+{ 
+	directory_entry_pointer = proc_mkdir(directory_name, NULL);
+	if(IS_ERR(directory_entry_pointer)) {
+		pr_alert("Error creating procfs directory: %s. Error code: %ld\n",directory_name,PTR_ERR(directory_entry_pointer));
+		return -1;
+	}
+	file_entry_pointer = proc_create_data(file_name,0666,directory_entry_pointer,&procfsmod_fops,(void *)file_buffer);
+	if(IS_ERR(file_entry_pointer)) {
+		pr_alert("Error creating procfs file: %s. Error code: %ld\n",file_name,PTR_ERR(file_entry_pointer));
+		proc_remove(directory_entry_pointer);
+		return -1;
+	}
+	
+	return 0; 
+}
+
+static void __exit procfsmod_exit(void) 
+{
+	if(file_entry_pointer)
+		proc_remove(file_entry_pointer);
+	if(directory_entry_pointer)
+		proc_remove(directory_entry_pointer);
+}
+
+module_init(procfsmod_init);
+module_exit(procfsmod_exit);
+MODULE_LICENSE("GPL");
