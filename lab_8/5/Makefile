@@ -1,4 +1,4 @@
-obj-m := fibchar.o
+obj-m := clipboard.o
 KERNELDIR = /lib/modules/$(shell uname -r)/build
 
 default:

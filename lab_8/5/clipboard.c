@@ -1,66 +1,47 @@
 #include<linux/module.h>
 #include<linux/fs.h>
-#include<linux/file.h>
 #include<linux/cdev.h>
 #include<linux/device.h>
 #include<asm/uaccess.h>
 
-#define NAME "fibdev"
-#define MAX_LENGTH 100
+#define NAME "clipdev" // <--
 
 static uint64_t first, second;
 
-// tablica do przechowywania obliczonego ciagu
-static uint64_t fib_tab[MAX_LENGTH];
+static char g_clip[1024]; // <--
+static size_t read = 0; // <--
+static size_t length = 0; // <--
 
-static dev_t number = 0;
-static struct cdev fib_cdev;
-static struct class *fib_class;
-static struct device *fib_device;
-
-static loff_t fib_llseek(struct file *filp, loff_t off, int whence)
-{
-    if (off >= MAX_LENGTH || off < 0)
-        return -1;
-    else
-        return fib_tab[off];
-}
-
-static void preload_table(void)
-{
-    int i;
-    fib_tab[0] = 0; 
-    fib_tab[1] = 1; 
-    for (i = 2; i < MAX_LENGTH; i++)
-        fib_tab[i] = fib_tab[i-1] + fib_tab[i-2];
-}
-
+// <--
 static ssize_t fib_read(struct file *f, char __user *u, size_t size, loff_t* pos)
 {
-    uint64_t tmp;
-    char fibnum[100];
-    size_t trans_unit = snprintf(fibnum,sizeof(fibnum),"%llu\n",first);
+    size_t to_copy = 0;
 
+    if (read == length) return 0;
 
-    if(trans_unit<0)
+    to_copy = length - read;
+    if (size < to_copy) to_copy = size;
+
+    if (copy_to_user(u, (void*) g_clip, to_copy))
         return -EIO;
-    if(copy_to_user(u,(void *)fibnum,trans_unit))
-        return -EIO;
 
-    tmp = first+second;
-    if(tmp>=second) {
-        first = second;
-        second = tmp;
-    } else
-        return 0;
+    read += to_copy;
 
-    return trans_unit;
+    return to_copy;
 }
 
+// <--
 static ssize_t fib_write(struct file *f, const char __user *u, size_t size, loff_t* pos)
 {
+    // nadpisz bufor
+    read = 0;
+    length = 1024;
+    if (size < length) length = size;
+    
+    if (copy_from_user((void*)g_clip, u, length))
+        return -EIO;
 
-    return 0;
+    return length;
 }
 
 static int fib_open(struct inode *ind, struct file *f) 
@@ -75,7 +56,6 @@ static int fib_release(struct inode *ind, struct file *f)
     return 0;
 }
 
-
 static struct file_operations fibop = 
 {
     .owner = THIS_MODULE,
@@ -83,15 +63,15 @@ static struct file_operations fibop =
     .release = fib_release,
     .read = fib_read,
     .write = fib_write,
-    .llseek = fib_llseek
 };
 
-
+static dev_t number = 0;
+static struct cdev fib_cdev;
+static struct class *fib_class;
+static struct device *fib_device;
 
 static int __init fibchar_init(void)
 {
-    preload_table();
-
     if(alloc_chrdev_region(&number,0,1,NAME)<0) {
         printk(KERN_ALERT "[fibdev]: Region allocation error!\n");
         return -1;
@@ -123,6 +103,8 @@ static int __init fibchar_init(void)
         return -1;
     }
 
+    memset(g_clip, '\0', 1024); // <--
+
     return 0;
 }
 
@@ -140,3 +122,4 @@ static void __exit fibchar_exit(void)
 module_init(fibchar_init);
 module_exit(fibchar_exit);
 MODULE_LICENSE("GPL");
+MODULE_VERSION("1.0");

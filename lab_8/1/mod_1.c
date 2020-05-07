@@ -62,52 +62,46 @@ static struct device *fib_device;
 
 static int __init fibchar_init(void)
 {
-    while(false)
-    {
-wyjatek1:
-        printk(KERN_ALERT"[fibdev]: Region allocation error!\n");
-        return-1;
-
-wyjatek2:
-        printk(KERN_ALERT"[fibdev]: Error creating class: %ld!\n",PTR_ERR(fib_class));
-        unregister_chrdev_region(number,1);
-        return -1;
-
-wyjatek3:
-        printk(KERN_ALERT"[fibdev]: Error adding cdev!\n");
-        class_destroy(fib_class);
-        unregister_chrdev_region(number,1);
-        return -1;
-
-wyjatek4:
-        printk(KERN_ALERT"[fibdev]: Error creating device:%ld!\n",PTR_ERR(fib_device));
-        cdev_del(&fib_cdev);
-        class_destroy(fib_class);
-        unregister_chrdev_region(number,1);
-        return -1;
-    }
-
-    if(alloc_chrdev_region(&number,0,1,NAME)<0) {
-        goto wyjatek1;
-    }
+    if(alloc_chrdev_region(&number,0,1,NAME)<0) 
+        goto error_flag_1;
 
     fib_class = class_create(THIS_MODULE,NAME);
-    if(IS_ERR(fib_class)) {
-        goto wyjatek2;
-    }
+    if(IS_ERR(fib_class))
+        goto error_flag_2;
 
     cdev_init(&fib_cdev,&fibop);
     fib_cdev.owner = THIS_MODULE;
 
-    if(cdev_add(&fib_cdev,number,1)) {
-        goto wyjatek3;
-    }
+    if(cdev_add(&fib_cdev,number,1))
+        goto error_flag_3;
 
     fib_device = device_create(fib_class, NULL, number, NULL, NAME);
-    if(IS_ERR(fib_device)) {
-        goto wyjatek4;
-    }
+    if(IS_ERR(fib_device))
+        goto error_flag_4;
+
     return 0;
+
+    error_flag_1:
+            printk(KERN_ALERT"[fibdev]: Region allocation error!\n");
+            return-1;
+
+    error_flag_2:
+            printk(KERN_ALERT"[fibdev]: Error creating class: %ld!\n",PTR_ERR(fib_class));
+            unregister_chrdev_region(number,1);
+            return -1;
+
+    error_flag_3:
+            printk(KERN_ALERT"[fibdev]: Error adding cdev!\n");
+            class_destroy(fib_class);
+            unregister_chrdev_region(number,1);
+            return -1;
+
+    error_flag_4:
+            printk(KERN_ALERT"[fibdev]: Error creating device:%ld!\n",PTR_ERR(fib_device));
+            cdev_del(&fib_cdev);
+            class_destroy(fib_class);
+            unregister_chrdev_region(number,1);
+            return -1;
 }
 
 static void __exit fibchar_exit(void)
@@ -124,6 +118,3 @@ static void __exit fibchar_exit(void)
 module_init(fibchar_init);
 module_exit(fibchar_exit);
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Arkadiusz Chrobot <a.chrobot@tu.kielce.pl>");
-MODULE_DESCRIPTION("A pseudo character device that generates Fibonacci numbers");
-MODULE_VERSION("1.0");

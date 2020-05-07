@@ -6,28 +6,18 @@
 
 
 void main() {
-	
-	int file_desc, wyraz;
+    int fd, to_read;
+    fd = open("/dev/fibdev", O_RDONLY | O_APPEND);
 
-	printf("Podaj, ktory wyraz ciagu fibonacciego odczytac ze sterownika: ");
-	scanf(" %d", &wyraz);	
+    scanf(" %d", &to_read);
 
-	file_desc = open("/dev/fibdev", O_RDONLY | O_APPEND);
+    if (fd < 0) {
+        printf("nie ma urzadzenia!\n");
+        abort();
+    }
 
-	if (file_desc < 0) {
-		printf("Nie moge otworzyc pliku urzadzenia: /dev/fibdev\n");
-		exit(-1);
-	}
-	if (--wyraz >= 0) {
-		unsigned long long val = lseek(file_desc, wyraz, 0);
+    unsigned long long val = lseek(fd, to_read, 0);
+    printf("odczytano %lld\n", val);
 
-		if (val == -1)
-			printf("Blad");
-		else
-			printf("Odczytany wyraz przez lseek(): %llu\n", val);
-	} else
-		printf("Blad\n");
-	
-	close(file_desc);
-	
+    close(fd);
 }
