@@ -22,7 +22,7 @@ static ssize_t fib_read(struct file *f, char __user *u, size_t size, loff_t* pos
     to_copy = length - read;
     if (size < to_copy) to_copy = size;
 
-    if (copy_to_user(u, (void*) g_clip, to_copy))
+    if (copy_to_user(u, (void*) &g_clip[read], to_copy))
         return -EIO;
 
     read += to_copy;
